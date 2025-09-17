@@ -15,3 +15,6 @@ Imports:
     rlang,
     stringr,
     tibble
+Suggests: 
+    knitr,
+    rmarkdown

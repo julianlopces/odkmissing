@@ -1,23 +1,11 @@
----
-output: github_document
----
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  fig.path = "man/figures/README-",
-  out.width = "100%"
-)
-```
-
----
+------------------------------------------------------------------------
 
 ### OKRMISSING
 
-```markdown
+``` markdown
 # okrmissing
 
 <!-- badges: start -->
@@ -45,20 +33,18 @@ You can install the development version of **okrmissing** from GitHub:
 remotes::install_github("julianlopces/okrmissing")
 ```
 
-
----
+------------------------------------------------------------------------
 
 ## Example (Pipeline)
-
 
 Suppose you have:
 
 - An **ODK questionnaire** in Excel (`Encuesta.xlsx`),  
-- A **raw dataset** exported from ODK (`data_raw.xlsx`).  
+- A **raw dataset** exported from ODK (`data_raw.xlsx`).
 
 You can run the full missing pipeline like this:
 
-```{r example, eval=FALSE}
+``` r
 library(okrmissing)
 
 # Import questionnaire and propagate required flags
@@ -95,14 +81,14 @@ base_missing <- base_missing |>
 
 Once you have the package there is one function summarizing all
 
-Instead of running each step manually, you can use the wrapper 
+Instead of running each step manually, you can use the wrapper
 `create_missing_vars()` which combines the three core functions:
 
 - `import_odk_propagate_required()`
 - `build_spec_for_flags()`
 - `flags_missing_por_variable()`
 
-```{r full-pipeline, eval=FALSE}
+``` r
 library(okrmissing)
 
 # Run the full pipeline in one step
@@ -122,6 +108,4 @@ head(res$data)
 
 # Inspect how many missings were flagged
 table(res$data$flag_missing)
-
 ```
-
