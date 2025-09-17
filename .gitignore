@@ -1,3 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.httr-oauth
+.DS_Store
+.quarto
 # Archivos temporales de R
 .Ruserdata
 .Rapp.history
