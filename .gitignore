@@ -19,3 +19,4 @@ vignettes/*.pdf
 
 # Archivos de ejemplo grandes
 data-raw/
+.Rproj.user

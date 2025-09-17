@@ -1,4 +1,4 @@
-#' okrmissing: herramientas para flags de missing con ODK
+#' odkmissing: herramientas para flags de missing con ODK
 #'
 #' Herramientas para importar un XLSForm ODK y generar flags de missings
 #'

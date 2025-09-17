@@ -1,9 +1,9 @@
-Package: okrmissing
-Title: What the Package Does (One Line, Title Case)
+Package: odkmissing
+Title: Herramientas para importar un XLSForm ODK y generar flags de missings
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+    person("Julián", "López", , "julianlopces@gmail.com", role = c("aut", "cre"))
+Description: "Provides tools to handle missing values in ODK-based survey data.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

@@ -3,16 +3,16 @@
 
 ------------------------------------------------------------------------
 
-### OKRMISSING
+### ODKMISSING
 
 ``` markdown
-# okrmissing
+# odkmissing
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/julianlopces/okrmissing/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/julianlopces/okrmissing/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/julianlopces/odkmissing/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/julianlopces/odkmissing/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-`okrmissing` is an R package to **generate and validate missing value flags** 
+`odkmissing` is an R package to **generate and validate missing value flags** 
 for ODK-based survey data.  
 
 It provides tools to:
@@ -26,11 +26,11 @@ It provides tools to:
 
 ## Installation
 
-You can install the development version of **okrmissing** from GitHub:
+You can install the development version of **odkmissing** from GitHub:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("julianlopces/okrmissing")
+remotes::install_github("julianlopces/odkmissing")
 ```
 
 ------------------------------------------------------------------------
@@ -45,7 +45,7 @@ Suppose you have:
 You can run the full missing pipeline like this:
 
 ``` r
-library(okrmissing)
+library(odkmissing)
 
 # Import questionnaire and propagate required flags
 ODK_filtrado <- import_odk_propagate_required("Encuesta.xlsx", required_value = "yes")
@@ -89,7 +89,7 @@ Instead of running each step manually, you can use the wrapper
 - `flags_missing_por_variable()`
 
 ``` r
-library(okrmissing)
+library(odkmissing)
 
 # Run the full pipeline in one step
 res <- create_missing_vars(
