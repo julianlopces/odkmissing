@@ -109,3 +109,17 @@ head(res$data)
 # Inspect how many missings were flagged
 table(res$data$flag_missing)
 ```
+
+# Create skip vars
+
+``` r
+
+# after computing spec_for_flags and datos_tokens
+base_skips <- create_skip_vars(
+  data          = datos_tokens,
+  spec          = spec_for_flags,
+  prefix        = "s",
+  numeric_conds = TRUE
+)
+table(base_skips$flag_skips)
+```
