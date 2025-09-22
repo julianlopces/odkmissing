@@ -115,29 +115,40 @@ build_spec_for_flags <- function(datos,
       token_values[[token]] <- 1L
     }
 
-    # C) ${VAR} = n -> VAR (si 1) o VAR_eq_n
+    # C) ${VAR} = n  -> token SIEMPRE 'VAR' y guardar n en when_values[['VAR']]
     eq_pat <- "\\$\\{([^}]+)\\}\\s*=\\s*(\\d+)"
     while (TRUE) {
       m <- stringr::str_match(work, eq_pat)
       if (all(is.na(m))) break
-      var <- m[2]; val <- as.integer(m[3])
-      token <- if (val == 1L) var else paste0(var, "_eq_", val)
+      var <- m[2]; val <- as.numeric(m[3])
+      token <- var
       work  <- stringr::str_replace(work, eq_pat, token)
-      tokens <- c(tokens, token); token_values[[token]] <- val
+      # Unir valores si ya existían
+      if (!is.null(token_values[[token]])) {
+        token_values[[token]] <- sort(unique(c(as.numeric(token_values[[token]]), val)))
+      } else {
+        token_values[[token]] <- val
+      }
+      tokens <- c(tokens, token)
     }
 
-    # D) ${VAR} != n -> NOT <token>
+    # D) ${VAR} != n -> reemplazar por 'NOT VAR' y guardar n en when_values[['VAR']]
     neq_pat <- "\\$\\{([^}]+)\\}\\s*!=\\s*(\\d+)"
     while (TRUE) {
       m <- stringr::str_match(work, neq_pat)
       if (all(is.na(m))) break
-      var <- m[2]; val <- as.integer(m[3])
-      token <- if (val == 1L) var else paste0(var, "_eq_", val)
+      var <- m[2]; val <- as.numeric(m[3])
+      token <- var
       work  <- stringr::str_replace(work, neq_pat, paste0("NOT ", token))
-      tokens <- c(tokens, token); token_values[[token]] <- val
+      if (!is.null(token_values[[token]])) {
+        token_values[[token]] <- sort(unique(c(as.numeric(token_values[[token]]), val)))
+      } else {
+        token_values[[token]] <- val
+      }
+      tokens <- c(tokens, token)
     }
 
-    # E) ${VAR} >,<,>=,<= thr -> VAR__gt_thr, etc. (metadato para crear dummies)
+    # E) ${VAR} >,<,>=,<= thr -> VAR__gt_thr, etc.
     comp_map <- list(">"="__gt_", ">="="__ge_", "<"="__lt_", "<="="__le_")
     comp_pat <- "\\$\\{([^}]+)\\}\\s*(>=|<=|>|<)\\s*(\\d+(?:\\.\\d+)?)"
     while (TRUE) {
@@ -177,7 +188,7 @@ build_spec_for_flags <- function(datos,
     sin_relevancia = purrr::map_lgl(ODK_pregs$relevance_use, ~ is.na(norm_expr(.x)))
   )
 
-  # --- 5) Crear dummies de comparadores en `datos` (sin %>%)
+  # --- 5) Crear dummies de comparadores en `datos`
   crear_dummies_comparadores <- function(datos, spec_df) {
     comp_all <- dplyr::bind_rows(spec_df$comparators)
     if (nrow(comp_all) == 0) return(datos)
@@ -192,19 +203,20 @@ build_spec_for_flags <- function(datos,
         next
       }
       x <- suppressWarnings(as.numeric(datos[[v]]))
-      cmp <-
-        if (op == ">")  x >  thr else
-          if (op == ">=") x >= thr else
-            if (op == "<")  x <  thr else
-              if (op == "<=") x <= thr else NA
-      datos[[tk]] <- ifelse(isTRUE(cmp), 1L, 0L)
+      cmp <- switch(op,
+                    ">"  = x >  thr,
+                    ">=" = x >= thr,
+                    "<"  = x <  thr,
+                    "<=" = x <= thr,
+                    NA)
+      datos[[tk]] <- ifelse(!is.na(cmp) & cmp, 1L, 0L)
     }
     datos
   }
 
   datos_cmp <- crear_dummies_comparadores(datos, spec_tokens)
 
-  # --- 6) Asegurar tokens faltantes como 0 (para selected(), etc.) (sin %>%)
+  # --- 6) Dummies faltantes como 0
   todos_tokens <- unique(unlist(spec_tokens$when_vars))
   faltan <- setdiff(todos_tokens, names(datos_cmp))
   if (length(faltan)) {
@@ -212,7 +224,7 @@ build_spec_for_flags <- function(datos,
     for (nm in faltan) datos_cmp[[nm]] <- 0L
   }
 
-  # --- 7) Armar spec_for_flags (sin %>%)
+  # --- 7) spec_for_flags
   spec_for_flags <- dplyr::transmute(
     spec_tokens,
     var,
@@ -222,7 +234,6 @@ build_spec_for_flags <- function(datos,
     manual_expr = manual_expr
   )
 
-  # salida
   list(
     spec_for_flags = spec_for_flags,
     datos_tokens   = datos_cmp
