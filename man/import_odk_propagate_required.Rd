@@ -2,7 +2,7 @@
 % Please edit documentation in R/odk_import.R
 \name{import_odk_propagate_required}
 \alias{import_odk_propagate_required}
-\title{Importar XLSForm ODK y propagar relevancias de grupos (filtrando obligatorias)}
+\title{Import ODK XLSForm and propagate group relevances (filtering required)}
 \usage{
 import_odk_propagate_required(
   path,
@@ -14,32 +14,31 @@ import_odk_propagate_required(
 )
 }
 \arguments{
-\item{path}{Ruta al archivo XLS/XLSX del formulario ODK.}
+\item{path}{Path to the XLS/XLSX ODK form.}
 
-\item{sheet}{(opcional) Nombre o índice de hoja a leer. Default: primero.}
+\item{sheet}{Optional sheet name or index. Default: first sheet.}
 
-\item{select_regex}{Regex para tipos que empiezan con "select". Default: \code{"^select"}.}
+\item{select_regex}{Regex for types starting with "select". Default: \code{"^select"}.}
 
-\item{extra_types}{Tipos adicionales a conservar. Default: \code{c("integer","begin group","end group","text")}.}
+\item{extra_types}{Extra types to keep. Default: \code{c("integer","begin group","end group","text")}.}
 
-\item{drop_begin_end}{Si \code{TRUE}, remueve filas \code{begin group}/\code{end group}. Default: \code{TRUE}.}
+\item{drop_begin_end}{If \code{TRUE}, drop begin/end group rows. Default: \code{TRUE}.}
 
-\item{required_value}{Cadena que indica cómo se marcó "obligatorio" en la columna
-\code{required}. Usar típicamente \code{"TRUE"} o \code{"yes"} (no sensible a mayúsculas/minúsculas).
-Default: \code{"TRUE"}.}
+\item{required_value}{How “required” was encoded in ODK (e.g., \code{"TRUE"} or \code{"yes"}). Case-insensitive.}
 }
 \value{
-\code{data.frame} con columnas \code{type, name, label, required, relevance, constraint},
-donde \code{relevance} es la relevancia propagada. Sólo incluye preguntas obligatorias.
+A data.frame with columns \verb{type, name, label, required, relevance, constraint},
+where \code{relevance} is the propagated relevance. Only required questions are included.
 }
 \description{
-Lee el archivo ODK (XLS/XLSX), filtra tipos relevantes y propaga las
-condiciones de \code{relevance} desde \emph{begin group} hasta su \emph{end group}
-correspondiente (emparejando por \code{name}), concatenando con \code{" and "}
-y respetando anidamientos. Luego filtra para dejar sólo las preguntas
-marcadas como obligatorias según \code{required_value}.
+Reads an ODK XLS/XLSX, filters relevant types, and propagates \code{relevance}
+from \emph{begin group} to its matching \emph{end group} (by \code{name}),
+concatenating with \code{" and "} and respecting nesting. Then it filters to keep
+only questions marked as required according to \code{required_value}.
 }
 \examples{
-# out <- import_odk_propagate_required("ruta/al/formulario.xlsx", required_value = "yes")
+\dontrun{
+out <- import_odk_propagate_required("form.xlsx", required_value = "yes")
+}
 
 }
