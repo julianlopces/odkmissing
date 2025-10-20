@@ -59,14 +59,14 @@ build_spec_for_flags <- function(datos,
                                  usar_col = if ("relevance_final" %in% names(ODK_filtrado)) "relevance_final" else "relevance") {
   stopifnot(is.data.frame(datos), is.data.frame(ODK_filtrado))
 
-  # --- 1) Preguntas (no grupos) + columna de relevancia a usar (sin %>%)
+  # 1) Preguntas (no grupos)
   ODK_pregs <- dplyr::filter(
     ODK_filtrado,
     !tolower(.data$type) %in% c("begin group","begin_group","end group","end_group")
   )
   ODK_pregs <- dplyr::mutate(ODK_pregs, relevance_use = .data[[usar_col]])
 
-  # --- 2) Normalizador mínimo
+  # 2) Normalizador
   norm_expr <- function(x) {
     x <- ifelse(is.na(x), "", as.character(x))
     x <- stringr::str_replace_all(x, "\\s+", " ")
@@ -75,7 +75,7 @@ build_spec_for_flags <- function(datos,
     x
   }
 
-  # --- 3) Traductor ODK -> tokens + manual_expr (incluye comparadores)
+  # 3) Traductor
   translate_relevance <- function(expr) {
     out <- list(
       manual_expr = NA_character_,
@@ -91,7 +91,64 @@ build_spec_for_flags <- function(datos,
     token_values <- list()
     comp_specs <- list()
 
-    # A) not(selected(${VAR}, 'code')) -> NOT VAR_code
+    # --- PRIORIDAD: patrones de vacíos ---
+    # 3A) not(empty(${VAR})) -> NOT IS_EMPTY_VAR
+    pat_not_empty <- "not\\s*\\(\\s*empty\\s*\\(\\s*\\$\\{([^}]+)\\}\\s*\\)\\s*\\)"
+    while (TRUE) {
+      m <- stringr::str_match(work, pat_not_empty)
+      if (all(is.na(m))) break
+      full <- m[1]; var <- m[2]
+      tk <- paste0("IS_EMPTY_", var)
+      work <- stringr::str_replace(work, stringr::fixed(full), paste0("NOT ", tk))
+      tokens <- c(tokens, tk); token_values[[tk]] <- 1L
+    }
+
+    # 3B) empty(${VAR}) -> IS_EMPTY_VAR
+    pat_empty <- "empty\\s*\\(\\s*\\$\\{([^}]+)\\}\\s*\\)"
+    while (TRUE) {
+      m <- stringr::str_match(work, pat_empty)
+      if (all(is.na(m))) break
+      full <- m[1]; var <- m[2]
+      tk <- paste0("IS_EMPTY_", var)
+      work <- stringr::str_replace(work, stringr::fixed(full), tk)
+      tokens <- c(tokens, tk); token_values[[tk]] <- 1L
+    }
+
+    # 3C) ${VAR} = ''  o  ${VAR} = ""  -> IS_EMPTY_VAR
+    pat_eq_empty <- "\\$\\{([^}]+)\\}\\s*=\\s*(['\"])\\s*\\2"
+    while (TRUE) {
+      m <- stringr::str_match(work, pat_eq_empty)
+      if (all(is.na(m))) break
+      var <- m[2]
+      tk <- paste0("IS_EMPTY_", var)
+      work <- stringr::str_replace(work, pat_eq_empty, tk)
+      tokens <- c(tokens, tk); token_values[[tk]] <- 1L
+    }
+
+    # 3D) string-length(${VAR}) = 0  -> IS_EMPTY_VAR
+    pat_strlen_eq0 <- "string-length\\s*\\(\\s*\\$\\{([^}]+)\\}\\s*\\)\\s*=\\s*0"
+    while (TRUE) {
+      m <- stringr::str_match(work, pat_strlen_eq0)
+      if (all(is.na(m))) break
+      full <- m[1]; var <- m[2]
+      tk <- paste0("IS_EMPTY_", var)
+      work <- stringr::str_replace(work, stringr::fixed(full), tk)
+      tokens <- c(tokens, tk); token_values[[tk]] <- 1L
+    }
+
+    # 3E) string-length(${VAR}) > 0  -> NOT IS_EMPTY_VAR
+    pat_strlen_gt0 <- "string-length\\s*\\(\\s*\\$\\{([^}]+)\\}\\s*\\)\\s*>\\s*0"
+    while (TRUE) {
+      m <- stringr::str_match(work, pat_strlen_gt0)
+      if (all(is.na(m))) break
+      full <- m[1]; var <- m[2]
+      tk <- paste0("IS_EMPTY_", var)
+      work <- stringr::str_replace(work, stringr::fixed(full), paste0("NOT ", tk))
+      tokens <- c(tokens, tk); token_values[[tk]] <- 1L
+    }
+
+    # --- selected() y not(selected()) ---
+    # 3F) not(selected(${VAR}, 'code')) -> NOT VAR_code
     notsel_pat <- "not\\s*\\(\\s*selected\\s*\\(\\s*\\$\\{([^}]+)\\}\\s*,\\s*'([^']+)'\\s*\\)\\s*\\)"
     while (TRUE) {
       m <- stringr::str_match(work, notsel_pat)
@@ -99,11 +156,10 @@ build_spec_for_flags <- function(datos,
       full <- m[1]; var <- m[2]; code <- m[3]
       token <- paste0(var, "_", code)
       work  <- stringr::str_replace(work, stringr::fixed(full), paste0("NOT ", token))
-      tokens <- c(tokens, token)
-      token_values[[token]] <- 1L
+      tokens <- c(tokens, token); token_values[[token]] <- 1L
     }
 
-    # B) selected(${VAR}, 'code') -> VAR_code
+    # 3G) selected(${VAR}, 'code') -> VAR_code
     sel_pat <- "selected\\s*\\(\\s*\\$\\{([^}]+)\\}\\s*,\\s*'([^']+)'\\s*\\)"
     while (TRUE) {
       m <- stringr::str_match(work, sel_pat)
@@ -111,11 +167,11 @@ build_spec_for_flags <- function(datos,
       full <- m[1]; var <- m[2]; code <- m[3]
       token <- paste0(var, "_", code)
       work  <- stringr::str_replace(work, stringr::fixed(full), token)
-      tokens <- c(tokens, token)
-      token_values[[token]] <- 1L
+      tokens <- c(tokens, token); token_values[[token]] <- 1L
     }
 
-    # C) ${VAR} = n  -> token SIEMPRE 'VAR' y guardar n en when_values[['VAR']]
+    # --- igualdades / desigualdades numéricas ---
+    # 3H) ${VAR} = n  -> usar token 'VAR' y acumular valores en when_values[['VAR']]
     eq_pat <- "\\$\\{([^}]+)\\}\\s*=\\s*(\\d+)"
     while (TRUE) {
       m <- stringr::str_match(work, eq_pat)
@@ -123,7 +179,6 @@ build_spec_for_flags <- function(datos,
       var <- m[2]; val <- as.numeric(m[3])
       token <- var
       work  <- stringr::str_replace(work, eq_pat, token)
-      # Unir valores si ya existían
       if (!is.null(token_values[[token]])) {
         token_values[[token]] <- sort(unique(c(as.numeric(token_values[[token]]), val)))
       } else {
@@ -132,7 +187,7 @@ build_spec_for_flags <- function(datos,
       tokens <- c(tokens, token)
     }
 
-    # D) ${VAR} != n -> reemplazar por 'NOT VAR' y guardar n en when_values[['VAR']]
+    # 3I) ${VAR} != n -> NOT VAR  + acumular valor en when_values[['VAR']]
     neq_pat <- "\\$\\{([^}]+)\\}\\s*!=\\s*(\\d+)"
     while (TRUE) {
       m <- stringr::str_match(work, neq_pat)
@@ -148,7 +203,7 @@ build_spec_for_flags <- function(datos,
       tokens <- c(tokens, token)
     }
 
-    # E) ${VAR} >,<,>=,<= thr -> VAR__gt_thr, etc.
+    # 3J) comparadores numéricos -> token sintético + metadato
     comp_map <- list(">"="__gt_", ">="="__ge_", "<"="__lt_", "<="="__le_")
     comp_pat <- "\\$\\{([^}]+)\\}\\s*(>=|<=|>|<)\\s*(\\d+(?:\\.\\d+)?)"
     while (TRUE) {
@@ -162,7 +217,10 @@ build_spec_for_flags <- function(datos,
       comp_specs[[length(comp_specs)+1]] <- tibble::tibble(token=token, var=var, op=op, thr=thr)
     }
 
-    # F) Operadores a estándar
+    # 3K) Limpieza: reemplazar restos ${var} -> var (por si quedaron sueltos)
+    work <- stringr::str_replace_all(work, "\\$\\{([^}]+)\\}", "\\1")
+
+    # 3L) Operadores lógicos estándar
     work <- stringr::str_replace_all(work, "(?i)\\band\\b", "AND")
     work <- stringr::str_replace_all(work, "(?i)\\bor\\b",  "OR")
     work <- stringr::str_replace_all(work, "(?i)\\bnot\\b", "NOT")
@@ -176,7 +234,7 @@ build_spec_for_flags <- function(datos,
     out
   }
 
-  # --- 4) Aplicar traductor a todas las preguntas (sin %>%)
+  # 4) Aplicar traductor
   res_list <- purrr::map(ODK_pregs$relevance_use, translate_relevance)
 
   spec_tokens <- tibble::tibble(
@@ -188,7 +246,7 @@ build_spec_for_flags <- function(datos,
     sin_relevancia = purrr::map_lgl(ODK_pregs$relevance_use, ~ is.na(norm_expr(.x)))
   )
 
-  # --- 5) Crear dummies de comparadores en `datos`
+  # 5) Dummies comparadores
   crear_dummies_comparadores <- function(datos, spec_df) {
     comp_all <- dplyr::bind_rows(spec_df$comparators)
     if (nrow(comp_all) == 0) return(datos)
@@ -214,9 +272,25 @@ build_spec_for_flags <- function(datos,
     datos
   }
 
-  datos_cmp <- crear_dummies_comparadores(datos, spec_tokens)
+  # 5 bis) Dummies IS_EMPTY_*
+  crear_dummies_empty <- function(datos, spec_df) {
+    all_tokens <- unique(unlist(spec_df$when_vars))
+    empties <- all_tokens[grepl("^IS_EMPTY_", all_tokens)]
+    if (!length(empties)) return(datos)
+    for (tk in empties) {
+      v <- sub("^IS_EMPTY_", "", tk)
+      x <- datos[[v]]
+      # vacío si NA o cadena vacía (tras trim)
+      is_empty <- is.na(x) | (is.character(x) & trimws(x) == "")
+      datos[[tk]] <- as.integer(is_empty)
+    }
+    datos
+  }
 
-  # --- 6) Dummies faltantes como 0
+  datos_cmp <- crear_dummies_comparadores(datos, spec_tokens)
+  datos_cmp <- crear_dummies_empty(datos_cmp, spec_tokens)
+
+  # 6) Tokens faltantes → 0
   todos_tokens <- unique(unlist(spec_tokens$when_vars))
   faltan <- setdiff(todos_tokens, names(datos_cmp))
   if (length(faltan)) {
@@ -224,7 +298,7 @@ build_spec_for_flags <- function(datos,
     for (nm in faltan) datos_cmp[[nm]] <- 0L
   }
 
-  # --- 7) spec_for_flags
+  # 7) spec_for_flags
   spec_for_flags <- dplyr::transmute(
     spec_tokens,
     var,
@@ -239,4 +313,3 @@ build_spec_for_flags <- function(datos,
     datos_tokens   = datos_cmp
   )
 }
-
