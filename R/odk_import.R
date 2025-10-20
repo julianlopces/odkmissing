@@ -21,6 +21,7 @@
 #' @examples
 #' # out <- import_odk_propagate_required("ruta/al/formulario.xlsx", required_value = "yes")
 #'
+#' @export
 import_odk_propagate_required <- function(path,
                                           sheet = NULL,
                                           select_regex = "^select",
